@@ -38,10 +38,14 @@ app.get('/', (req, res) => {
 });
 
 // Configure OpenAI (Direct SDK for simple tasks)
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
-});
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+const openai = OPENAI_API_KEY
+    ? new OpenAI({
+        apiKey: OPENAI_API_KEY,
+        baseURL: OPENAI_BASE_URL
+    })
+    : null;
 
 const MODEL_NAME = process.env.MODEL_NAME || 'gpt-4o';
 
@@ -75,20 +79,24 @@ async function checkLLMConnection() {
 }
 
 // --- LangChain Agent Setup ---
-const searchTool = new TavilySearch({ 
-    maxResults: 3,
-    apiKey: process.env.TAVILY_API_KEY // Explicitly pass key
-});
-const tools = [searchTool];
+const searchTool = process.env.TAVILY_API_KEY
+    ? new TavilySearch({
+        maxResults: 3,
+        apiKey: process.env.TAVILY_API_KEY
+    })
+    : null;
+const tools = searchTool ? [searchTool] : [];
 
-const llm = new ChatOpenAI({
-    modelName: MODEL_NAME,
-    openAIApiKey: process.env.OPENAI_API_KEY,
-    configuration: { baseURL: process.env.OPENAI_BASE_URL },
-    temperature: 0.7,
-    maxRetries: 2,
-    timeout: 120000 // Increase to 120s
-});
+const llm = OPENAI_API_KEY
+    ? new ChatOpenAI({
+        modelName: MODEL_NAME,
+        openAIApiKey: OPENAI_API_KEY,
+        configuration: { baseURL: process.env.OPENAI_BASE_URL },
+        temperature: 0.7,
+        maxRetries: 2,
+        timeout: 120000
+    })
+    : null;
 
 // --- Helper: Safe JSON Parse ---
 function parseJSONFromLLM(content) {
@@ -123,6 +131,9 @@ app.post('/api/generate-profile', async (req, res) => {
         if (!text || !name || text.trim().length === 0) {
             return res.status(400).json({ error: '请提供有效的文本或人物名称' });
         }
+        if (!llm) {
+            return res.status(500).json({ error: 'OPENAI_API_KEY 未配置' });
+        }
 
         console.log(`Starting Sequential Profile Generation for: ${name}`);
 
@@ -149,9 +160,10 @@ app.post('/api/generate-profile', async (req, res) => {
             const query = decisionContent.split("SEARCH_QUERY:")[1].trim().replace(/[\[\]]/g, "");
             console.log(`Searching for more info: ${query}`);
             try {
-                // Fix: TavilySearch tool usually expects an object { input: "query" }
-                const searchResults = await searchTool.invoke({ input: query });
-                enrichedContext += "\n\n--- 补充搜索信息 ---\n" + searchResults;
+                if (searchTool) {
+                    const searchResults = await searchTool.invoke({ input: query });
+                    enrichedContext += "\n\n--- 补充搜索信息 ---\n" + searchResults;
+                }
             } catch (searchErr) {
                 console.warn("Search failed, continuing with original text:", searchErr.message);
             }
@@ -194,6 +206,7 @@ app.post('/api/generate-memory-index', async (req, res) => {
     try {
         const { text, name, promptTemplate } = req.body;
         if (!text || !name) return res.status(400).json({ error: 'Missing text or name' });
+        if (!openai) return res.status(500).json({ error: 'OPENAI_API_KEY 未配置' });
 
         const prompt = promptTemplate.replace(/{name}/g, name);
         const truncatedText = text.substring(0, 100000);
@@ -224,6 +237,7 @@ app.post('/api/deduce-path', async (req, res) => {
     try {
         const { node, profile, promptTemplate } = req.body;
         if (!node || !profile) return res.status(400).json({ error: 'Missing node or profile' });
+        if (!openai) return res.status(500).json({ error: 'OPENAI_API_KEY 未配置' });
 
         const name = profile.name;
         const nodeTitle = node.title;
@@ -289,6 +303,7 @@ app.post('/api/generate-scene-image', async (req, res) => {
     try {
         const { description, profile } = req.body;
         if (!description) return res.status(400).json({ error: 'Missing description' });
+        if (!llm || !OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY 未配置' });
 
         console.log(`Generating image for scene: ${description.substring(0, 30)}...`);
 
