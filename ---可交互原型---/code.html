@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>AI Parallel Universe - 微信读书模拟</title>
+    
+    <!-- External Fonts & Scripts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Inter:wght@300;400;600&family=Ma+Shan+Zheng&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    
+    <!-- React & Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://lf-cdn.coze.cn/obj/unpkg/flow-platform/chat-app-sdk/1.2.0-beta.19/libs/cn/index.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#11c4d4",
+                        secondary: "#117A7A",
+                        tealDeep: "#0D5F5F",
+                        "reading-bg": "#FFFFFF",
+                        "background-light": "#f4f1ea",
+                        "background-dark": "#1a1a1a",
+                    },
+                    fontFamily: {
+                        sans: ["Space Grotesk", "Inter", "sans-serif"],
+                        display: ["Noto Serif SC", "serif"],
+                        serif: ["Noto Serif SC", "serif"],
+                        handwriting: ["Ma Shan Zheng", "cursive"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.375rem",
+                        "md": "0.375rem",
+                    },
+                },
+            },
+        };
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-white text-slate-700 transition-colors duration-300;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .serif-font { font-family: 'Noto Serif SC', serif; }
+            .handwriting-font { font-family: 'Ma Shan Zheng', cursive; }
+            
+            .step-line::before {
+                content: '';
+                position: absolute;
+                left: 15px;
+                top: 32px;
+                bottom: -8px;
+                width: 1px;
+                background-color: #E2E8F0;
+            }
+            .step-line-last::before { display: none; }
+            
+            .material-symbols-outlined {
+                font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            }
+            .fill-icon {
+                font-variation-settings: 'FILL' 1;
+            }
+            
+            .glass-header {
+                @apply bg-white/90 backdrop-blur-xl border-b border-slate-100 dark:bg-black/90 dark:border-slate-800;
+            }
+            
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+            .polaroid-stack {
+                position: relative;
+                width: 32px;
+                height: 38px;
+            }
+            .polaroid-layer {
+                position: absolute;
+                width: 28px;
+                height: 34px;
+                background: white;
+                border: 0.5px solid #e5e7eb;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .polaroid-layer::after {
+                content: '';
+                position: absolute;
+                top: 3px;
+                left: 3px;
+                right: 3px;
+                bottom: 8px;
+                background: #f0f0f0;
+            }
+            .polaroid-1 { transform: rotate(-8deg); z-index: 10; left: 0; }
+            .polaroid-2 { transform: rotate(4deg); z-index: 20; left: 4px; }
+            
+            .developing-effect {
+                filter: contrast(0.8) brightness(1.2) sepia(0.2) saturate(0.5) blur(2px);
+                opacity: 0.6;
+            }
+            
+            @keyframes float {
+                0%, 100% { transform: translateY(0) rotate(-1deg); }
+                50% { transform: translateY(-10px) rotate(1deg); }
+            }
+            .animate-float {
+                animation: float 6s ease-in-out infinite;
+            }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { HashRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // Shared Components
+        const StatusBar = () => (
+            <div className="h-10 w-full flex items-center justify-between px-6 bg-transparent sticky top-0 z-50 pointer-events-none">
+                <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">9:41</span>
+                <div className="flex gap-1.5 items-center text-slate-900 dark:text-slate-100">
+                    <span className="material-icons-round text-sm">signal_cellular_alt</span>
+                    <span className="material-icons-round text-sm">wifi</span>
+                    <span className="material-icons-round text-sm">battery_full</span>
+                </div>
+            </div>
+        );
+
+        // Screen 1: Branch Path Details (Dynamic)
+        const BranchDetails = () => {
+            const navigate = useNavigate();
+            const location = useLocation();
+            const { memoryId, pathId } = location.state || {};
+
+            const memory = React.useMemo(() => MEMORY_DATA.find(m => m.id === memoryId), [memoryId]);
+            const path = React.useMemo(() => (memory && memory.paths ? memory.paths.find(p => p.id === pathId) : null), [memory, pathId]);
+            const isReality = React.useMemo(() => (memory && memory.paths && memory.paths.length > 0 && memory.paths[0].id === pathId), [memory, pathId]);
+
+            React.useEffect(() => {
+                window.scrollTo(0, 0);
+            }, []);
+
+            // Fallback content if details are missing
+            const details = (path && path.details) || {
+                steps: [
+                    { id: "01", text: "推演数据生成中..." },
+                    { id: "02", text: "正在计算平行宇宙的可能性..." },
+                    { id: "04", text: "结果即将揭晓..." }
+                ],
+                emotions: [
+                    { icon: "😶", label: "未知" },
+                    { icon: "🤔", label: "思考" },
+                    { icon: "😐", label: "平淡" },
+                    { icon: "😌", label: "接受" }
+                ],
+                quote: isReality ? "那段日子，刻骨铭心。" : "“每一个选择，都是一次新生。”"
+            };
+
+            if (!path) {
+                return (
+                    <div className="bg-reading-bg min-h-screen flex items-center justify-center">
+                        <div className="text-center">
+                            <p className="text-slate-500 mb-4">未找到推演路径数据</p>
+                            <button onClick={() => navigate('/memory-lane')} className="text-primary font-bold">返回记忆长廊</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="bg-reading-bg min-h-screen">
+                    <StatusBar />
+                    <nav className="flex items-center justify-between px-4 py-2 sticky top-10 bg-white z-20">
+                        <button onClick={() => navigate('/memory-lane', { state: { expandId: memoryId } })} className="p-2 text-slate-400 hover:text-slate-600">
+                            <span className="material-icons-round">arrow_back_ios_new</span>
+                        </button>
+                        <h1 className="text-base font-semibold serif-font text-slate-900 tracking-tight">
+                            {isReality ? "回忆节点详情" : "推演分支详情"}
+                        </h1>
+                        <button className="p-2 text-slate-400 hover:text-slate-600">
+                            <span className="material-icons-round">more_horiz</span>
+                        </button>
+                    </nav>
+                    <main className="max-w-md mx-auto p-6 space-y-10 pb-44">
+                        <header className="text-center space-y-3 pt-4">
+                            <div className="inline-flex items-center gap-1.5 text-primary bg-primary/5 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase">
+                                <span className="material-icons-round text-xs">auto_awesome</span>
+                                {isReality ? "微信读书 - LifeIF AI 记忆回溯" : "微信读书 - LifeIF AI 模拟"}
+                            </div>
+                            <h2 className="text-2xl font-bold serif-font leading-snug text-slate-900">
+                                路径：{path.title}
+                            </h2>
+                            <p className="text-sm text-slate-500 serif-font mt-2 px-4">{path.desc}</p>
+                            <div className="w-8 h-0.5 bg-primary/20 mx-auto mt-4"></div>
+                        </header>
+                        
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-2 mb-6">
+                                <h3 className="font-bold text-sm serif-font text-slate-400 uppercase tracking-widest">
+                                    {isReality ? "心路历程" : "推演历程"}
+                                </h3>
+                            </div>
+                            <div className="space-y-8">
+                                {details.steps.map((step, index) => (
+                                    <div key={index} className={`relative flex gap-5 ${index === details.steps.length - 1 ? 'step-line-last' : 'step-line'}`}>
+                                        <div className={`z-10 flex items-center justify-center w-8 h-8 rounded-full border ${index === details.steps.length - 1 ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-white text-primary border-primary'} text-xs font-bold shrink-0`}>
+                                            {step.id}
+                                        </div>
+                                        <div className="pt-1">
+                                            <p className={`text-[15px] leading-relaxed serif-font ${index === details.steps.length - 1 ? 'text-slate-900 font-bold' : 'text-slate-600'}`}>
+                                                {step.text}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className="py-8 border-t border-slate-50">
+                            <div className="flex items-center gap-2 mb-8">
+                                <h3 className="font-bold text-sm serif-font text-slate-400 uppercase tracking-widest">
+                                    {isReality ? "当年心境" : "心理状态演变"}
+                                </h3>
+                            </div>
+                            <div className="relative h-24 flex items-end justify-between px-2">
+                                <svg className="absolute inset-0 w-full h-full -z-0 overflow-visible" preserveAspectRatio="none" viewBox="0 0 400 100">
+                                    <path d="M 50 20 C 150 20, 250 80, 350 80" fill="none" opacity="0.3" stroke="#11c4d4" strokeDasharray="4" strokeWidth="2"></path>
+                                    <circle cx="50" cy="20" fill="#11c4d4" r="4"></circle>
+                                    <circle cx="350" cy="80" fill="#11c4d4" r="4"></circle>
+                                </svg>
+                                {details.emotions.map((emo, idx) => (
+                                    <div key={idx} className="flex flex-col items-center gap-3 z-10 w-1/4">
+                                        <span className="text-xl">{emo.icon}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{emo.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className="space-y-4 pt-6 border-t border-slate-50">
+                            <div className="relative p-8 bg-slate-50 rounded-2xl">
+                                <div className="absolute left-4 top-4 text-3xl text-primary/10 serif-font">“</div>
+                                <p className="text-lg italic serif-font leading-relaxed text-slate-700 text-center relative z-10 px-4">
+                                    {details.quote}
+                                </p>
+                                <div className="absolute right-4 bottom-4 text-3xl text-primary/10 serif-font rotate-180">“</div>
+                            </div>
+                            <div className="pt-8 space-y-3">
+                                <button onClick={() => alert("已分享至朋友圈")} className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-4 px-4 rounded-2xl shadow-lg active:scale-[0.98] transition-all">
+                                    <span className="material-symbols-outlined text-xl">share</span>
+                                    <span className="text-sm font-bold serif-font">分享书签至朋友圈</span>
+                                </button>
+                                <button onClick={() => navigate('/chat', { state: { memoryId, pathId } })} className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 py-3 px-4 rounded-2xl shadow-sm active:scale-[0.98] transition-all hover:bg-slate-50">
+                                    <span className="material-symbols-outlined text-xl text-primary">forum</span>
+                                    <span className="text-sm font-bold serif-font">和她聊聊</span>
+                                </button>
+                            </div>
+                        </section>
+                    </main>
+                    <div className="fixed bottom-0 left-0 right-0 px-6 pt-4 pb-8 bg-white/95 backdrop-blur-md border-t border-slate-100 z-40">
+                        <div className="max-w-md mx-auto flex flex-col gap-1">
+                            <button onClick={() => navigate('/memory-lane', { state: { expandId: memoryId } })} className="w-full text-center text-[13px] font-medium text-slate-400 flex items-center justify-center gap-1 hover:text-primary transition-colors py-2">
+                                <span className="material-icons-round text-sm">keyboard_return</span>
+                                返回记忆长廊，探索其他可能
+                            </button>
+                            <button onClick={() => navigate('/')} className="w-full text-center text-[13px] font-medium text-slate-400 flex items-center justify-center gap-1 hover:text-primary transition-colors py-2">
+                                <span className="material-icons-round text-sm">menu_book</span>
+                                返回阅读器
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Screen 2: Protagonist Chat
+        const ChatView = () => {
+            const navigate = useNavigate();
+            const location = useLocation();
+            const { memoryId, pathId } = location.state || {};
+            
+            const memory = React.useMemo(() => MEMORY_DATA.find(m => m.id === memoryId), [memoryId]);
+            const path = React.useMemo(() => (memory && memory.paths ? memory.paths.find(p => p.id === pathId) : null), [memory, pathId]);
+
+            // Dynamic Content
+            const title = path ? `平行路径：${path.title}` : (memory ? `回忆节点：${memory.title}` : "苏敏");
+            const date = memory ? memory.date : "未知时间";
+            const initialMessage = path 
+                ? `如果是那个平行时空的我也许会说：${path.details.quote}` 
+                : (memory ? `想起那件事，我总觉得... ${memory.quote}` : "你好，我是苏敏。");
+            
+            const contextTag = path ? "平行时空推演" : "回忆录对话";
+
+            return (
+                <div className="flex flex-col h-screen overflow-hidden bg-white">
+                    <StatusBar />
+                    <header className="glass-header sticky top-0 z-10 border-b border-slate-100 px-4 pt-12 pb-3">
+                        <div className="flex items-center justify-between">
+                            <button onClick={() => navigate(-1)} className="p-2 -ml-2">
+                                <span className="material-symbols-outlined text-slate-600">arrow_back_ios_new</span>
+                            </button>
+                            <div className="flex flex-col items-center">
+                                <h1 className="text-[17px] font-bold text-slate-900">苏敏</h1>
+                                <div className="flex items-center gap-1">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${path ? 'bg-teal-500' : 'bg-slate-400'}`}></span>
+                                    <span className="text-[11px] text-slate-500 font-medium uppercase tracking-tight">{title}</span>
+                                </div>
+                            </div>
+                            <button className="p-2 -mr-2">
+                                <span className="material-symbols-outlined text-slate-600">more_horiz</span>
+                            </button>
+                        </div>
+                    </header>
+                    <main className="flex-1 overflow-y-auto p-4 space-y-6 bg-white no-scrollbar">
+                        <div className="flex justify-center">
+                            <span className="text-[11px] bg-slate-100 text-slate-400 px-3 py-1 rounded-full">{contextTag} · {date}</span>
+                        </div>
+                        <div className="flex items-start gap-3 max-w-[85%]">
+                            <div className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 shadow-sm text-primary">
+                                <span className="material-symbols-outlined text-[20px] fill-icon">auto_awesome</span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-2xl rounded-tl-none shadow-sm">
+                                    <p className="text-[15px] leading-relaxed text-slate-700">
+                                        {initialMessage}
+                                    </p>
+                                </div>
+                                <span className="text-[10px] text-slate-400 ml-1">苏敏 · AI {contextTag}</span>
+                            </div>
+                        </div>
+                        <div className="flex flex-row-reverse items-start gap-3 max-w-[85%] ml-auto">
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="bg-primary p-4 rounded-2xl rounded-tr-none shadow-sm">
+                                    <p className="text-[15px] leading-relaxed text-white">
+                                        {path ? "那如果当时做出了不一样的选择，现在的你会是什么心情？" : "这一路走来，您觉得最艰难的是什么？"}
+                                    </p>
+                                </div>
+                                <span className="text-[10px] text-slate-400 mr-1">刚刚</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 px-12">
+                            <span className="text-[11px] text-slate-400 italic">苏敏正在沉思...</span>
+                        </div>
+                    </main>
+                    <footer className="bg-white border-t border-slate-100 p-4 pb-8">
+                        <div className="flex items-center gap-3">
+                            <button className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+                                <span className="material-symbols-outlined">sentiment_satisfied</span>
+                            </button>
+                            <div className="flex-1 relative">
+                                <input className="w-full bg-slate-50 border-none rounded-2xl px-4 py-2.5 text-[15px] focus:ring-1 focus:ring-teal-100 placeholder-slate-400" placeholder="与书中的她深入交流..." type="text"/>
+                            </div>
+                            <button className="flex-shrink-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shadow-md">
+                                <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+                            </button>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+
+
+
+
+        // Screen 5: Reading View
+        const ReadingView = () => {
+            const navigate = useNavigate();
+            const [showModal, setShowModal] = useState(false);
+
+            return (
+                <div className="bg-background-light dark:bg-background-dark font-serif text-gray-800 dark:text-gray-200 transition-colors duration-300 min-h-screen">
+                    <StatusBar />
+                    <main className="px-6 py-4 max-w-md mx-auto min-h-[calc(100vh-140px)] flex flex-col">
+                        <header className="mb-8 opacity-60 flex items-center space-x-2 font-sans text-sm">
+                            <span className="text-xl font-bold">1. 黎明</span>
+                        </header>
+                        <article className="reading-text text-lg space-y-6 flex-grow serif-font">
+                            <p>2020年9月24日，农历八月初八。</p>
+                            <p className="relative group">
+                                <span className="border-b-2 border-primary/20 pb-1">
+                                    56岁的苏敏，离家出走了。她开着一辆小Polo，拖着一顶帐篷，揣着一张没有几个钱的银行卡，走得坚决。
+                                </span>
+                            </p>
+                            <p className="opacity-40 italic">章节继续...</p>
+                        </article>
+                        
+                        <div 
+                            onClick={() => setShowModal(true)}
+                            className="fixed bottom-28 right-6 flex items-center group cursor-pointer active:opacity-70 transition-all duration-300 animate-pulse"
+                        >
+                            <div className="flex flex-col items-end mr-3">
+                                <span className="text-primary font-sans text-xs tracking-wider opacity-90 mb-0.5">解锁人生书签？</span>
+                                <div className="h-0.5 w-8 bg-primary/20 rounded-full"></div>
+                            </div>
+                            <div className="polaroid-stack">
+                                <div className="polaroid-layer polaroid-1"></div>
+                                <div className="polaroid-layer polaroid-2 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-[12px] text-primary/40 relative z-30 fill-icon">auto_awesome</span>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    <nav className="fixed bottom-0 w-full bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 pb-8 pt-3 px-6 z-40">
+                        <div className="max-w-md mx-auto flex justify-between items-center text-gray-500">
+                            <div className="flex flex-col items-center space-y-1"><span className="material-icons">menu</span><span className="text-[10px]">目录</span></div>
+                            <div className="flex flex-col items-center space-y-1"><span className="material-icons">query_stats</span><span className="text-[10px]">进度</span></div>
+                            <div className="flex flex-col items-center space-y-1 text-primary"><span className="material-icons">edit_note</span><span className="text-[10px]">写笔记</span></div>
+                        </div>
+                    </nav>
+
+                    {/* Quick Simulation Modal */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowModal(false)}>
+                            <div className="w-full bg-white dark:bg-gray-900 rounded-t-3xl p-6 pb-12 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6"></div>
+                                <div className="flex items-center space-x-3 mb-6">
+                                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg">
+                                        <span className="material-icons text-white">psychology</span>
+                                    </div>
+                                    <div>
+                                        <h2 className="font-sans font-bold text-lg leading-tight dark:text-white">平行抉择</h2>
+                                        <p className="font-sans text-xs opacity-60 dark:text-slate-400">由 AI 模拟的多重宇宙人生</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-4 mb-8 text-center py-4">
+                                    <p className="text-sm text-slate-500 serif-font leading-relaxed">
+                                        基于当前进度，AI 捕获到了一个可能改变命运的瞬间。
+                                    </p>
+                                </div>
+                                <div className="flex space-x-3">
+                                    <button onClick={() => setShowModal(false)} className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold text-sm">返回阅读</button>
+                                    <button onClick={() => navigate('/unlock')} className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold text-sm shadow-lg shadow-primary/30">揭开命运书签</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Screen 6: Polaroid Unlock
+        const UnlockView = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="bg-white min-h-screen flex flex-col items-center overflow-hidden">
+                    <StatusBar />
+
+                    <main className="flex-1 w-full max-w-md flex flex-col items-center justify-center px-8 relative pb-10">
+                        <div className="group bg-white p-4 pb-20 rotate-[-1deg] shadow-2xl border border-slate-100 transition-all duration-500 hover:scale-105 hover:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.25)] hover:rotate-1 animate-float cursor-pointer">
+                            <div className="relative aspect-[3/4] w-64 overflow-hidden bg-slate-100">
+                                <img 
+                                    alt="protagonist" 
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                                    src="Photos/索引 1 出逃启程.png"
+                                />
+                                <div className="absolute inset-0 pointer-events-none opacity-10 bg-[url('https://www.transparenttextures.com/patterns/pinstriped-suit.png')] group-hover:opacity-0 transition-opacity duration-500"></div>
+                                <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                            </div>
+                        </div>
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 opacity-[0.03]">
+                            <span className="material-symbols-outlined text-[300px]">auto_awesome</span>
+                        </div>
+                    </main>
+                    <footer className="w-full max-w-md px-10 pb-20 flex flex-col gap-4">
+
+                        <button onClick={() => navigate('/memory-lane')} className="w-full bg-white border border-slate-200 text-slate-600 py-4 px-6 rounded-full flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">
+                            <span className="material-symbols-outlined text-xl">collections_bookmark</span>
+                            <span className="text-sm font-bold serif-font tracking-wide">查看人生画廊</span>
+                        </button>
+                        <button onClick={() => navigate('/memory-lane', { state: { expandId: 'departure' } })} className="w-full bg-primary text-white py-4 px-6 rounded-full flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all">
+                            <span className="material-symbols-outlined text-xl fill-icon">alt_route</span>
+                            <span className="text-lg font-bold serif-font tracking-wide">开启平行推演</span>
+                        </button>
+                    </footer>
+                </div>
+            );
+        };
+
+        // Data for Memory Lane
+        const MEMORY_DATA = [
+            {
+                id: "childhood",
+                date: "1964-1980",
+                location: "西藏·昌都",
+                title: "高原童年",
+                desc: "在海拔3000米的兵工厂长大，作为长姐，她早早背负起“小家长”的责任。规矩与顺从，是那个年代给她的唯一教育。",
+                quote: "“听话，是那个年代最大的美德。”",
+                img: "Photos/索引 5 西藏童年与长姐责任.png",
+                fullText: "童年的记忆是灰色的瓦片和远处白皑皑的雪山。在西藏昌都的兵工厂里，规矩是铁打的。作为长姐，照顾弟弟是天职，听从父母是本分。那时候的苏敏，还不知道“自我”两个字怎么写。她以为，人生就是沿着长辈画好的线，不出差错地走下去。",
+                paths: [
+                    { 
+                        id: "p1", 
+                        title: "顺从长姐", 
+                        desc: "继续扮演完美的姐姐和女儿，将自己的需求压缩到尘埃里，成为那个“懂事得让人心疼”的孩子。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "弟弟想要的新衣，她主动让出；家里的家务，她默默承担。" },
+                                { id: "02", text: "父母夸她“懂事”，她笑着接受，却在深夜抚摸那件不属于自己的裙子。" },
+                                { id: "04", text: "她学会了用牺牲换取认可，这种惯性将伴随她的大半生。" }
+                            ],
+                            emotions: [
+                                { icon: "😶", label: "隐忍" },
+                                { icon: "😔", label: "委屈" },
+                                { icon: "🔒", label: "压抑" },
+                                { icon: "🥀", label: "早熟" }
+                            ],
+                            quote: "“只要他们高兴，我怎样都行。”"
+                        }
+                    },
+                    { 
+                        id: "p2", 
+                        title: "叛逆争夺", 
+                        desc: "在一次分发礼物时，她第一次大声说出“我也想要”。虽然换来的是责骂，但心里的一颗种子发芽了。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "看着弟弟手中的玩具，她突然不想再忍，伸手去抢。" },
+                                { id: "02", text: "父亲严厉的呵斥声响起，她含着泪倔强地昂着头。" },
+                                { id: "04", text: "那一晚她没吃饭，但第一次感觉到了“我”的存在。" }
+                            ],
+                            emotions: [
+                                { icon: "😠", label: "愤怒" },
+                                { icon: "🔥", label: "觉醒" },
+                                { icon: "😢", label: "疼痛" },
+                                { icon: "🌱", label: "萌芽" }
+                            ],
+                            quote: "“凭什么我就得让？”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "逃避责任", 
+                        desc: "既然做不好，干脆什么都不做。她开始装病逃避家务，虽然换来了短暂的清闲，却失去了父母的信任。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "假装肚子疼躺在床上，听着母亲在厨房忙碌的声音，心里既愧疚又窃喜。" },
+                                { id: "02", text: "弟弟跑来告状，她索性闭上眼睛装睡，拒绝面对。" },
+                                { id: "04", text: "父母失望的眼神让她明白，逃避并不能解决问题，只会让自己更孤立。" }
+                            ],
+                            emotions: [
+                                { icon: "🛌", label: "逃避" },
+                                { icon: "🤥", label: "伪装" },
+                                { icon: "😟", label: "愧疚" },
+                                { icon: "❄️", label: "孤立" }
+                            ],
+                            quote: "“反正也没人真的在乎我。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "aa_marriage",
+                date: "1990年代",
+                location: "郑州·家中",
+                title: "AA制婚姻",
+                desc: "丈夫开始每周核对花销，锱铢必较。这种羞辱像钝刀割肉，迫使她走上打工之路，开启了漫长而冰冷的AA制生活。",
+                quote: "“就得找到依据，知道去处。”",
+                img: "Photos/索引 3 女儿短信与AA制婚姻揭示.png",
+                fullText: "在苏敏下岗后，丈夫老杜开始每周与她核对生活费花销，要求每一笔都说得明明白白，声称‘就得找到依据，知道去处’。这种经济上的羞辱让苏敏无法忍受，大约半年后，她开始打工自己赚钱，从此夫妻变为彻底的AA制。就连女儿结婚，两人也是分开包红包。",
+                paths: [
+                    { 
+                        id: "p1", 
+                        title: "经济独立", 
+                        desc: "咬牙出去打工，送报纸、当超市促销员。身体累垮了，但腰杆挺直了。虽然婚姻名存实亡，但至少买东西不用看人脸色。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "顶着烈日送报纸，汗水湿透了后背，但手里攥着的工资是热的。" },
+                                { id: "02", text: "丈夫再次嘲讽时，她冷冷地回怼：“花我自己赚的钱，不用你管。”" },
+                                { id: "04", text: "AA制成了保护色，虽然冷漠，但至少保留了最后的底线。" }
+                            ],
+                            emotions: [
+                                { icon: "💦", label: "艰辛" },
+                                { icon: "💪", label: "坚韧" },
+                                { icon: "🛡️", label: "自尊" },
+                                { icon: "❄️", label: "疏离" }
+                            ],
+                            quote: "“我自己赚的钱，花着硬气。”"
+                        }
+                    },
+                    { 
+                        id: "p2", 
+                        title: "伸手讨要", 
+                        desc: "因为缺乏技能或勇气，选择忍受丈夫的盘问，为了几块钱的菜金低声下气，尊严被一点点磨灭。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "每月例行“报账”，丈夫拿着账本，眼神像审视犯人。" },
+                                { id: "02", text: "为了买一瓶擦脸油，她编造了菜价上涨的谎言，心跳得厉害。" },
+                                { id: "04", text: "她看着镜子里日益憔悴的脸，觉得自己像个乞丐。" }
+                            ],
+                            emotions: [
+                                { icon: "🙇‍♀️", label: "卑微" },
+                                { icon: "😰", label: "恐慌" },
+                                { icon: "🌫️", label: "麻木" },
+                                { icon: "💔", label: "破碎" }
+                            ],
+                            quote: "“手心向上的日子，真难熬。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "果断离婚", 
+                        desc: "在第一次被要求AA制时，她选择了拒绝并提出离婚。虽然过程艰难，但她更早地获得了自由。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "面对丈夫的无理要求，她冷冷地甩出一句：“既然这样，那就离吧。”" },
+                                { id: "02", text: "经历了漫长的拉锯战和财产分割，她终于拿到了那个红本本。" },
+                                { id: "04", text: "虽然生活变得拮据，但呼吸的每一口空气都是自由的。" }
+                            ],
+                            emotions: [
+                                { icon: "⚔️", label: "决绝" },
+                                { icon: "�️", label: "自由" },
+                                { icon: "🌬️", label: "清新" },
+                                { icon: "🌈", label: "新生" }
+                            ],
+                            quote: "“与其互相折磨，不如一别两宽。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "medical_card",
+                date: "往昔岁月",
+                location: "郑州·家中",
+                title: "医保卡风波",
+                desc: "母亲病重，她借用丈夫医保卡买药。次日，密码被改。那一刻，她明白在这个家里，她连外人都不如。",
+                quote: "“那张卡，从此成了冰冷的塑料。”",
+                img: "Photos/索引 4 医保卡事件.png",
+                fullText: "有一次苏敏的母亲病了，她拿丈夫的医保卡买了药。第二天，丈夫就改了密码。这个举动像一盆冷水浇在苏敏心上。夫妻之间，竟然连几百块钱的药费都要防备。她意识到，在这个家里，她可能连一个外人都不如。",
+                paths: [
+                    { 
+                        id: "p1", 
+                        title: "默默忍受", 
+                        desc: "虽然心寒，但为了家庭表面的完整，她选择将委屈吞进肚子，从此不再触碰他的任何东西，心门彻底关闭。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "发现密码错误的那一刻，她愣在药店柜台前，脸涨得通红。" },
+                                { id: "02", text: "回到家，丈夫若无其事地看电视，她一句话没说，默默去做饭。" },
+                                { id: "04", text: "从此，她在这个家里学会了“客气”，像对待一个不好相处的房东。" }
+                            ],
+                            emotions: [
+                                { icon: "🧊", label: "寒心" },
+                                { icon: "🤐", label: "沉默" },
+                                { icon: "🛑", label: "界限" },
+                                { icon: "🏚️", label: "疏远" }
+                            ],
+                            quote: "“原来我们只是住在一起的陌生人。”"
+                        }
+                    },
+                    { 
+                        id: "p2", 
+                        title: "激烈对质", 
+                        desc: "无法压抑的愤怒爆发，她质问丈夫为何如此绝情。争吵升级为冷战，家庭氛围降至冰点，但至少她发出了声音。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "把医保卡摔在桌上：“你防贼呢？那是我妈救命的药！”" },
+                                { id: "02", text: "丈夫冷冷回应：“我的钱，我想改就改。”争吵声引来了邻居。" },
+                                { id: "04", text: "虽然结果没有改变，但她把积压多年的怨气吼了出来，心里反而空了一些。" }
+                            ],
+                            emotions: [
+                                { icon: "🤬", label: "愤怒" },
+                                { icon: "💥", label: "爆发" },
+                                { icon: "🧊", label: "僵局" },
+                                { icon: "🗣️", label: "宣泄" }
+                            ],
+                            quote: "“我也是人，我也有心！”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "以牙还牙", 
+                        desc: "她也改掉了自己的银行卡密码，不再为家里花一分钱。家庭变成了冰冷的战场，谁也不让谁。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "第二天，她去银行挂失并重置了所有密码，将工资卡死死攥在手里。" },
+                                { id: "02", text: "丈夫要生活费时，她冷笑着回敬：“我的钱，我想怎么花就怎么花。”" },
+                                { id: "04", text: "互相防备的日子虽然累，但至少不再是单方面的受气包。" }
+                            ],
+                            emotions: [
+                                { icon: "⚔️", label: "反击" },
+                                { icon: "🛡️", label: "防御" },
+                                { icon: "❄️", label: "冷战" },
+                                { icon: "⚖️", label: "扯平" }
+                            ],
+                            quote: "“既然你不仁，别怪我不义。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "suicide",
+                date: "2019年",
+                location: "郑州·家中",
+                title: "至暗时刻",
+                desc: "抑郁症的确诊书，胸口的三刀疤痕。在那个绝望的午后，她用自残来换取丈夫的闭嘴，那是生命最低谷的嘶吼。",
+                quote: "“活着怎么这么难？”",
+                img: "Photos/索引 6 2019年自杀事件.png",
+                fullText: "2019年，苏敏确诊了中度抑郁症。长期的压抑让她处于崩溃边缘。有一次，丈夫在家里不停地挑刺，她实在受不了了，拿起水果刀往自己胸口扎了三刀。鲜血流出来，丈夫却只是冷眼旁观。那一刻，她心里的某种东西彻底死去了。她意识到，如果再不改变，她可能真的会死在这里。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "网络求生", 
+                        desc: "在无边的黑暗中，手机屏幕成了唯一的光。她偶然刷到了博主的自驾视频，一颗逃离的种子在绝望中悄然落下。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "深夜失眠，她漫无目的地刷着短视频，试图麻痹自己。" },
+                                { id: "02", text: "一个博主开着车周游全国的画面击中了她：“原来人还可以这样活？”" },
+                                { id: "04", text: "她反复看着那个视频，眼神里第一次有了一丝光亮。那成了她的救命稻草。" }
+                            ],
+                            emotions: [
+                                { icon: "📱", label: "沉迷" },
+                                { icon: "😲", label: "触动" },
+                                { icon: "✨", label: "微光" },
+                                { icon: "🌱", label: "渴望" }
+                            ],
+                            quote: "“我也想去看看外面的世界。”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "彻底沉沦", 
+                        desc: "放弃求生意志，任由抑郁情绪将自己吞噬。每天躺在床上，看着天花板发呆，世界变成了灰白色。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "伤口结痂了，但心里的洞越来越大。她连起床的力气都没有。" },
+                                { id: "02", text: "丈夫的唠叨变成了背景噪音，她仿佛灵魂出窍，感知不到疼痛。" },
+                                { id: "04", text: "她想，也许这就是终点，就这样静静地腐烂吧。" }
+                            ],
+                            emotions: [
+                                { icon: "🌫️", label: "空洞" },
+                                { icon: "📉", label: "绝望" },
+                                { icon: "🛌", label: "瘫痪" },
+                                { icon: "🌑", label: "死寂" }
+                            ],
+                            quote: "“就这样吧，累了。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "向人求助", 
+                        desc: "她敲开了邻居的门，或者拨打了求助热线。外界的介入打破了家里的死寂，她开始接受治疗。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "在最绝望的时候，她颤抖着拨通了女儿的电话求救。" },
+                                { id: "02", text: "在医生的帮助下，她开始服用抗抑郁药物，情绪慢慢平复。" },
+                                { id: "04", text: "虽然伤口还在，但她知道自己不能就这样放弃，还有人在爱着她。" }
+                            ],
+                            emotions: [
+                                { icon: "🆘", label: "求救" },
+                                { icon: "💊", label: "治疗" },
+                                { icon: "🌤️", label: "好转" },
+                                { icon: "💗", label: "被爱" }
+                            ],
+                            quote: "“救救我，我不想死。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "departure",
+                date: "2020年9月24日",
+                location: "郑州·家中",
+                title: "决意出走",
+                desc: "在那个沉默的下午，她没有像往常一样走进厨房，而是握紧了车钥匙。这一刻，忍耐到了极限。",
+                quote: "“这房子是我的，你滚出去。”",
+                img: "Photos/索引 1 出逃启程.png",
+                fullText: "2020年9月24日，农历八月初八。苏敏把最后一件行李搬上她分期付款买的小Polo。丈夫在旁边冷嘲热讽：“你还想出去？过不了几天就得哭着回来。”她没有回头，一脚油门踩了下去。离开了那个住了几十年的家，离开了那个让她窒息的男人。风吹进车窗，是自由的味道。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "义无反顾", 
+                        desc: "不管不顾地冲出去，哪怕前路未卜。ETC显示扣费81元，丈夫立刻打来电话讨债。她拔掉卡，扔进储物箱，第一次感到叛逆的快感。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "“砰”的一声关上车门，将那个窒息的家隔绝在身后。点火，挂挡，出发。" },
+                                { id: "02", text: "ETC显示扣费81元，丈夫立刻打来电话讨债。她拔掉卡，扔进储物箱，第一次感到叛逆的快感。" },
+                                { id: "04", text: "风吹进车窗，她握着方向盘，虽然前路未知，但此刻她是自己的主人。" }
+                            ],
+                            emotions: [
+                                { icon: "😰", label: "紧张" },
+                                { icon: "😤", label: "决绝" },
+                                { icon: "🕊️", label: "自由" },
+                                { icon: "🐣", label: "重生" }
+                            ],
+                            quote: "“风吹进车窗的时候，我终于感觉我是活着的。”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "放弃出走", 
+                        desc: "看着满地的行李和复杂的导航软件，恐惧瞬间吞噬了决绝。她想起了女儿刚稳定的工作，不想再给她添乱。最终，她默默将行李搬回了楼上，在丈夫的嘲讽声中，重新拿起了锅铲，继续忍受这窒息的日常。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "技术恐惧与生存焦虑压倒了冲动，看着复杂的导航界面，她退缩了。" },
+                                { id: "02", text: "默默搬回行李，丈夫在沙发上冷笑：“我就知道你不敢走。”" },
+                                { id: "04", text: "她重回厨房准备晚饭，将出走的念头深深埋葬在切菜声中。" }
+                            ],
+                            emotions: [
+                                { icon: "😖", label: "焦虑" },
+                                { icon: "📉", label: "挫败" },
+                                { icon: "🤐", label: "认命" },
+                                { icon: "🌫️", label: "压抑" }
+                            ],
+                            quote: "“原来，我连逃跑的资格都没有。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "向女儿坦白", 
+                        desc: "临行前，不舍与愧疚让她拨通了女儿的电话。听到女儿声音的那一刻，她崩溃大哭，和盘托出多年的压抑。女儿虽然震惊，但请求她暂时不要走，承诺会调节家庭矛盾。她心软了，为了女儿的安宁，再次选择了留下来。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "拨通女儿电话，情绪崩溃倾诉多年的压抑与委屈。" },
+                                { id: "02", text: "女儿介入调解，哭着请求母亲暂缓计划：“妈，为了我再忍忍。”" },
+                                { id: "04", text: "因亲情羁绊，她擦干眼泪，再次推迟了自我拯救的计划。" }
+                            ],
+                            emotions: [
+                                { icon: "😭", label: "崩溃" },
+                                { icon: "😌", label: "释放" },
+                                { icon: "🥺", label: "犹豫" },
+                                { icon: "🤝", label: "妥协" }
+                            ],
+                            quote: "“为了孩子，再忍忍吧。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "xiaolangdi",
+                date: "2020年9月24日晚",
+                location: "小浪底·停车场",
+                title: "小浪底第一夜",
+                desc: "第一次野外扎营，漆黑的夜和呼啸的风。煮面条时手在抖，但躺下那一刻，没有了恼人的鼾声，世界静得只剩下心跳。",
+                quote: "“没有恼人的鼾声，苏敏睡得格外安稳。”",
+                img: "Photos/索引 2 小浪底第一夜.png",
+                fullText: "苏敏临时决定在小浪底过夜。她在一个露天停车场停下，收费10元。这是她第一次在外扎营，有些不适应，刻意与其它房车保持距离。她用瓦斯炉和不粘锅给自己煮了一碗沾满辣椒的面条，并录制视频。花费1小时撑开帐篷，夜里给女儿发微信报平安后入睡。帐篷里没有丈夫的鼾声，她睡得格外安稳。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "适应露营", 
+                        desc: "笨手笨脚地撑开帐篷，煮了一碗热气腾腾的面。虽然孤独，但不用伺候任何人的感觉，让她尝到了久违的甜头。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "折腾了一小时才弄好帐篷，累得满头大汗，却很有成就感。" },
+                                { id: "02", text: "吃着简单的辣味面条，看着空旷的夜空，她长舒了一口气。" },
+                                { id: "04", text: "这一夜，她睡得比在家里任何时候都香，梦里没有争吵。" }
+                            ],
+                            emotions: [
+                                { icon: "⛺", label: "新奇" },
+                                { icon: "🍜", label: "满足" },
+                                { icon: "😴", label: "安稳" },
+                                { icon: "🌙", label: "宁静" }
+                            ],
+                            quote: "“原来一个人睡觉，是这么舒服。”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "恐惧退缩", 
+                        desc: "夜深了，停车场的风声像鬼哭狼嚎。恐惧战胜了自由的向往，她彻夜未眠，天一亮就收拾东西，狼狈地逃回了家。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "树影婆娑，每一声异响都让她惊恐万分，锁紧了车门。" },
+                                { id: "02", text: "想象中的危险被无限放大，她觉得自己太冲动、太幼稚。" },
+                                { id: "04", text: "黎明时分，她发动车子掉头，承认自己还没准备好面对世界。" }
+                            ],
+                            emotions: [
+                                { icon: "😱", label: "惊恐" },
+                                { icon: "👀", label: "警惕" },
+                                { icon: "🏳️", label: "退缩" },
+                                { icon: "🏠", label: "归巢" }
+                            ],
+                            quote: "“外面的世界太可怕了，我还是回去吧。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "遭遇驱赶", 
+                        desc: "第一次露营就遭遇了尴尬。保安敲着车窗让她离开，她像个做错事的孩子，连夜把车开到了荒郊野外，委屈得想哭。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "刚睡着就被一阵急促的敲窗声惊醒，手电筒的光刺得她睁不开眼。" },
+                                { id: "02", text: "保安不耐烦地催促：“这里不能停车，快走快走！”" },
+                                { id: "04", text: "她狼狈地发动车子，在漆黑的夜路里游荡，感觉天地之大竟无容身之处。" }
+                            ],
+                            emotions: [
+                                { icon: "🔦", label: "惊扰" },
+                                { icon: "😥", label: "窘迫" },
+                                { icon: "🌃", label: "漂泊" },
+                                { icon: "💧", label: "委屈" }
+                            ],
+                            quote: "“我想有个家，哪怕是车轮上的。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "xian",
+                date: "2020年10月",
+                location: "西安·停车场营地",
+                title: "西安夜话",
+                desc: "偶遇患抑郁症的年轻妻子。苏敏用自己的伤疤去温暖别人，第一次发现，原来自己并不是无用的废人。",
+                quote: "“怎么高兴怎么来。”",
+                img: "Photos/索引 7 西安与抑郁症夫妇的对话.png",
+                fullText: "在西安的一个露天停车场，苏敏遇到了一对年轻夫妇。妻子患有重度抑郁症，丈夫带着她出来散心。苏敏不避讳地分享了自己的病情和经历，告诉那位丈夫要多包容，并放手让妻子“怎么高兴怎么来”。她的理解和热心让那位母亲得到了宽慰，也让苏敏感受到了助人的价值。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "温暖互助", 
+                        desc: "像大姐姐一样拉着那位妻子的手，分享自己的经历。在安慰对方的同时，她也治愈了那个曾经无助的自己。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "她主动走过去，递上一杯热水，聊起了家常。" },
+                                { id: "02", text: "毫无保留地展示自己的伤疤，告诉对方：“你看，我也挺过来了。”" },
+                                { id: "04", text: "看着对方舒展的眉头，她感到了前所未有的价值感。她是有用的。" }
+                            ],
+                            emotions: [
+                                { icon: "🤝", label: "共情" },
+                                { icon: "❤️", label: "温暖" },
+                                { icon: "�", label: "价值" },
+                                { icon: "�", label: "互愈" }
+                            ],
+                            quote: "“妹子，别怕，咱怎么高兴怎么来。”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "避而远之", 
+                        desc: "看到那对夫妇，像看到了过去的自己。为了避免勾起痛苦的回忆，她选择了冷漠离开，继续封闭自己。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "听到“抑郁症”三个字，她心里咯噔一下，本能地想要逃离。" },
+                                { id: "02", text: "她匆匆收拾东西，换了一个停车位，假装没有看见他们。" },
+                                { id: "04", text: "独坐在车里，她叹了口气，自己的伤还没好，哪有力气救别人。" }
+                            ],
+                            emotions: [
+                                { icon: "🏃‍♀️", label: "逃避" },
+                                { icon: "🩹", label: "刺痛" },
+                                { icon: "🙈", label: "冷漠" },
+                                { icon: "�️", label: "阴影" }
+                            ],
+                            quote: "“各人有各人的苦，我管不了。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "情绪崩溃", 
+                        desc: "看到那对夫妇的痛苦，她被深深地触动，自己的抑郁情绪也被勾起。她陪着那个妻子一起哭了一场，虽然没有给出什么建议，但两颗破碎的心靠在了一起。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "看着那个流泪的妻子，她仿佛看到了当年的自己，眼泪止不住地流。" },
+                                { id: "02", text: "她走过去抱住那个陌生女人，两个人抱头痛哭，宣泄着各自的痛苦。" },
+                                { id: "04", text: "哭过之后，虽然问题还在，但心里那块大石头似乎轻了一些。" }
+                            ],
+                            emotions: [
+                                { icon: "😭", label: "宣泄" },
+                                { icon: "�", label: "拥抱" },
+                                { icon: "🌧️", label: "悲伤" },
+                                { icon: "🌫️", label: "共鸣" }
+                            ],
+                            quote: "“我们都太苦了，哭出来就好了。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "etc_card",
+                date: "2020年10月",
+                location: "云南·抚仙湖",
+                title: "81元的追债",
+                desc: "丈夫的第一个电话是为了讨债。这81块钱，彻底斩断了她最后的幻想。她拔掉卡，也拔掉了心里最后的一根刺。",
+                quote: "“就为了81块钱？”",
+                img: "Photos/索引 8 ETC卡与81元讨债电话.png",
+                fullText: "出发前一天，丈夫老杜要拔掉车上的ETC卡，怕苏敏乱花钱，被女婿劝阻。旅行中，在抚仙湖营地，苏敏接到丈夫打来的第一个电话，对方开口就说：‘你走高速了对吗？刷的我的卡，81块钱，赶紧还我。’ 苏敏气得挂掉电话，随后将ETC卡从车上扯下丢进抽屉。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "愤怒拔卡", 
+                        desc: "新仇旧恨涌上心头，她果断拔卡，拒绝支付。这一次，她不再是那个唯唯诺诺的家庭主妇，她是掌握方向盘的车长。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "“81块钱？你打电话来就为了这？”她对着电话冷笑出声。" },
+                                { id: "02", text: "挂断，拔卡，扔进储物箱，动作一气呵成，像是在进行某种仪式。" },
+                                { id: "04", text: "看着平静的湖面，她心里无比痛快。这81块，买断了她的愧疚。" }
+                            ],
+                            emotions: [
+                                { icon: "✂️", label: "决裂" },
+                                { icon: "🔥", label: "痛快" },
+                                { icon: "�", label: "拒绝" },
+                                { icon: "�️", label: "独立" }
+                            ],
+                            quote: "“这钱，我不还！这卡，我不用！”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "妥协转账", 
+                        desc: "为了息事宁人，不想在旅途中吵架，她忍着恶心把钱转了过去。丈夫的控制欲再次得逞，心情瞬间跌入谷底。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "听到丈夫的大吼，她下意识地感到害怕，手在发抖。" },
+                                { id: "02", text: "操作手机转账时，她觉得自己真窝囊，明明出来了还是逃不掉。" },
+                                { id: "04", text: "挂了电话，抚仙湖的美景也变得索然无味，她只想大哭一场。" }
+                            ],
+                            emotions: [
+                                { icon: "💸", label: "破财" },
+                                { icon: "😤", label: "憋屈" },
+                                { icon: "⛓️", label: "控制" },
+                                { icon: "�️", label: "扫兴" }
+                            ],
+                            quote: "“是不是我这辈子都欠他的？”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "歇斯底里", 
+                        desc: "积压的怒火彻底爆发，她在电话里和丈夫大吵一架，把几十年的陈芝麻烂谷子都抖了出来。虽然发泄了，但心情也彻底毁了。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "“你还有脸要钱？”她对着电话怒吼，引得路人纷纷侧目。" },
+                                { id: "02", text: "她一边哭一边骂，把这些年的委屈统统倒了出来，直到嗓子嘶哑。" },
+                                { id: "04", text: "挂了电话，她瘫坐在地上，感觉身体被掏空，只有无尽的疲惫。" }
+                            ],
+                            emotions: [
+                                { icon: "🤬", label: "暴怒" },
+                                { icon: "�", label: "失控" },
+                                { icon: "🗣️", label: "宣泄" },
+                                { icon: "🥀", label: "疲惫" }
+                            ],
+                            quote: "“凭什么？凭什么都是我忍？”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "chengdu",
+                date: "2020年10月底",
+                location: "成都·天府芙蓉园",
+                title: "重逢青春",
+                desc: "三十年后的同学聚会，乡音未改鬓毛衰。在欢声笑语中，她找回了那个爱笑、健谈的“苏敏”，而不仅仅是谁的附庸。",
+                quote: "“这下可以自己说了算，真的挺好。”",
+                img: "Photos/索引 9 成都同学会与青春往事.png",
+                fullText: "在成都，苏敏见到了三十年未见的高中同学。她们坐在茶馆里，喝着盖碗茶，说着久违的四川话。同学们惊叹于她的勇气，而她沉浸在一种久违的轻松中。她发现，离开家庭的她，原来这么爱笑，这么健谈。她不再是谁的妻子、谁的母亲，她只是苏敏。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "找回自我", 
+                        desc: "在四川话的谈笑声中，她忘记了烦恼。同学们眼里的敬佩让她意识到，自己的“出走”不是落魄，而是一种壮举。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "她绘声绘色地讲着路上的见闻，同学们听得津津有味。" },
+                                { id: "02", text: "老班长举杯敬她：“苏敏，你活出了我们想敢不敢活的样子！”" },
+                                { id: "04", text: "那一刻，她挺直了腰板。原来，她也可以是聚会的焦点。" }
+                            ],
+                            emotions: [
+                                { icon: "😄", label: "欢畅" },
+                                { icon: "🌟", label: "自信" },
+                                { icon: "🍵", label: "惬意" },
+                                { icon: "🦋", label: "蜕变" }
+                            ],
+                            quote: "“原来那个爱说爱笑的苏敏，一直都在。”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "自惭形秽", 
+                        desc: "看着同学们光鲜亮丽的生活，再看看自己寒酸的小车和漂泊的日子，自卑感油然而生，聚会后匆匆离开。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "同学们谈论着退休金和孙子，她插不上话，只能尴尬地赔笑。" },
+                                { id: "02", text: "有人问起她的丈夫，她支支吾吾，生怕被人看穿婚姻的狼狈。" },
+                                { id: "04", text: "聚会还没结束，她就找借口走了，觉得自己像个闯入天鹅群的丑小鸭。" }
+                            ],
+                            emotions: [
+                                { icon: "😓", label: "尴尬" },
+                                { icon: "📉", label: "自卑" },
+                                { icon: "🏃‍♀️", label: "逃离" },
+                                { icon: "☁️", label: "落差" }
+                            ],
+                            quote: "“我和她们，终究不是一路人了。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "过度炫耀", 
+                        desc: "为了证明自己过得好，她刻意夸大了旅途的精彩，隐瞒了其中的艰辛。聚会结束后，面对空荡荡的车厢，巨大的空虚感袭来。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "她大声谈论着风景和美食，享受着同学们羡慕的眼神，像个演说家。" },
+                                { id: "02", text: "对旅途中的孤独、危险和拮据闭口不谈，只展示光鲜的一面。" },
+                                { id: "04", text: "人群散去，她卸下伪装，发现这种表演比忍受孤独更累。" }
+                            ],
+                            emotions: [
+                                { icon: "🎭", label: "伪装" },
+                                { icon: "🗣️", label: "夸耀" },
+                                { icon: "😶", label: "空虚" },
+                                { icon: "🎭", label: "疲累" }
+                            ],
+                            quote: "“我这是在演给谁看呢？”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "chongqing",
+                date: "2020年11月",
+                location: "重庆·长江索道",
+                title: "俯瞰牢笼",
+                desc: "索道滑过江面，城市如积木般渺小。她突然顿悟，曾经困住她的家，不过是沧海一粟。天地宽了，心也就宽了。",
+                quote: "“还能需要彼此吗？”",
+                img: "Photos/索引 10 重庆长江索道上的思考.png",
+                fullText: "在重庆的长江索道上，苏敏俯瞰着这座立体的城市。脚下的房子密密麻麻，像一个个火柴盒。她想到了自己曾经住的那个家，那个困了她半辈子的“牢笼”。现在，她飞在了天上。那些曾经让她痛苦的人和事，变得像蚂蚁一样渺小。她终于明白，世界这么大，没有任何人值得她画地为牢。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "释怀放下", 
+                        desc: "看着脚下如蝼蚁般的人群，她释然了。那些曾经让她痛不欲生的争吵，在宏大的天地面前，连尘埃都算不上。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "江风吹过，她深吸一口气，感觉胸口的郁结散开了。" },
+                                { id: "02", text: "她想象着丈夫现在暴跳如雷的样子，只觉得可笑又可怜。" },
+                                { id: "04", text: "世界这么大，她还有很多路要走，绝不能回头。" }
+                            ],
+                            emotions: [
+                                { icon: "🕊️", label: "释然" },
+                                { icon: "🤏", label: "渺小" },
+                                { icon: "⛰️", label: "豁达" },
+                                { icon: "🔭", label: "远见" }
+                            ],
+                            quote: "“再见了，我的牢笼。”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "思念突袭", 
+                        desc: "看着万家灯火，孤独感突然袭来。她忍不住想给家里打个电话，哪怕是听听那熟悉的责骂声也好。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "索道停在半空，周围是欢声笑语的一家人，她显得格格不入。" },
+                                { id: "02", text: "掏出手机，手指在丈夫的号码上悬停良久，眼眶湿润。" },
+                                { id: "04", text: "习惯性的依赖像毒瘾一样发作，她差点就回头了。" }
+                            ],
+                            emotions: [
+                                { icon: "🏠", label: "恋家" },
+                                { icon: "😔", label: "孤独" },
+                                { icon: "🥀", label: "软弱" },
+                                { icon: "🔄", label: "反复" }
+                            ],
+                            quote: "“毕竟是几十年的家，哪能说断就断。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "眩晕退缩", 
+                        desc: "看着脚下的万丈深渊，恐高症和对未来的恐惧同时发作。她瘫坐在索道车厢里，根本无心欣赏风景，只想快点落地回家。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "随着索道升高，她的心跳越来越快，手心全是冷汗。" },
+                                { id: "02", text: "看着脚下的江水，她感到一阵眩晕，害怕自己会掉下去。" },
+                                { id: "04", text: "下了索道，她双腿发软，觉得自己根本不适合这种刺激的生活。" }
+                            ],
+                            emotions: [
+                                { icon: "💫", label: "眩晕" },
+                                { icon: "😨", label: "恐惧" },
+                                { icon: "🦵", label: "腿软" },
+                                { icon: "🏳️", label: "退缩" }
+                            ],
+                            quote: "“太高了，我受不了，我要回家。”"
+                        }
+                    }
+                ]
+            },
+            {
+                id: "newyear",
+                date: "2021年1月",
+                location: "海南·文昌",
+                title: "归宿是自己",
+                desc: "红毛衣，椰林风。一个人过年不再是凄凉，而是自由的勋章。她终于明白，最好的归宿不是婚姻，而是强大的内心。",
+                quote: "“我终于活成了别人羡慕的模样。”",
+                img: "Photos/索引 11 尾声——新年与自己.png",
+                fullText: "2021年的新年，苏敏在海南度过。她穿着鲜艳的红色毛衣，那是女儿寄来的礼物。她一个人在房车营地，做了几个好菜，倒了一杯酒。海风吹拂着椰林，她对着镜头举杯。这一刻，她不再感到孤独。她拥有了强大的内心，她就是自己最好的归宿。",
+                paths: [
+                    { 
+                        id: "p2", 
+                        title: "独自精彩", 
+                        desc: "穿上红毛衣，倒上一杯酒，对着大海干杯。她庆祝自己从半生的泥沼中爬了出来，庆祝这来之不易的新生。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "精心摆盘，调整镜头，她要记录下这个特别的新年。" },
+                                { id: "02", text: "“新年快乐，苏敏！”她对着镜头大声祝福自己，笑得像个孩子。" },
+                                { id: "04", text: "她终于明白，只要心是满的，哪里都是家，哪里都是归宿。" }
+                            ],
+                            emotions: [
+                                { icon: "🍷", label: "庆祝" },
+                                { icon: "🧧", label: "红火" },
+                                { icon: "😊", label: "满足" },
+                                { icon: "🏠", label: "归属" }
+                            ],
+                            quote: "“敬自己，敬自由，敬未来！”"
+                        }
+                    },
+                    { 
+                        id: "p1", 
+                        title: "倍感凄凉", 
+                        desc: "看着朋友圈里的团圆饭，听着远处的鞭炮声，孤独感如潮水般淹没。她开始怀疑自己的选择，是不是太自私了。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "拨通家里的视频，大家都在忙着吃喝，没人顾得上跟她多说几句。" },
+                                { id: "02", text: "挂了电话，面对着丰盛的菜肴，她突然没了胃口，眼泪掉进碗里。" },
+                                { id: "04", text: "海风有点冷，她裹紧了衣服，觉得自己像个无家可归的流浪汉。" }
+                            ],
+                            emotions: [
+                                { icon: "🍂", label: "凄凉" },
+                                { icon: "😭", label: "思亲" },
+                                { icon: "❓", label: "怀疑" },
+                                { icon: "❄️", label: "寒冷" }
+                            ],
+                            quote: "“大家都在团圆，只有我在流浪。”"
+                        }
+                    },
+                    { 
+                        id: "p3", 
+                        title: "拼桌过年", 
+                        desc: "实在忍受不了独自过年的冷清，她硬着头皮去蹭了别人的年夜饭。虽然热闹是别人的，但至少不用一个人面对空荡荡的房车。",
+                        details: {
+                            steps: [
+                                { id: "01", text: "看着隔壁房车一家人热火朝天地包饺子，她端着自己的菜走了过去。" },
+                                { id: "02", text: "邻居热情地接纳了她，大家推杯换盏，暂时忘却了身在异乡。" },
+                                { id: "04", text: "虽然笑着聊天，但心里清楚，这热闹终究是短暂的，明天还得赶路。" }
+                            ],
+                            emotions: [
+                                { icon: "🥟", label: "蹭饭" },
+                                { icon: "🍻", label: "热闹" },
+                                { icon: "😅", label: "尴尬" },
+                                { icon: "🤝", label: "慰藉" }
+                            ],
+                            quote: "“人多点，总比一个人强。”"
+                        }
+                    }
+                ]
+            }
+        ];
+
+        // Screen 7: Memory Lane (Bookmark Gallery)
+        const MemoryLane = () => {
+            const navigate = useNavigate();
+            const location = useLocation();
+            const [selectedId, setSelectedId] = React.useState((location.state && location.state.expandId) || null);
+
+            const selectedMemory = React.useMemo(() => 
+                MEMORY_DATA.find(m => m.id === selectedId), 
+            [selectedId]);
+
+            const handleChatClick = () => {
+                if (window.CozeWebSDK) {
+                    new window.CozeWebSDK.WebChatClient({
+                        config: {
+                            bot_id: '7601093033630810155',
+                        },
+                        componentProps: {
+                            title: 'Coze',
+                        },
+                        auth: {
+                            type: 'token',
+                            token: 'pat_lpS2K0RXBJyOufVAZCofCQ5R49tf7UqTnfvQKa8xnvVDPwPLV7pMAsbjKqSHAOS0',
+                            onRefreshToken: function () {
+                                return 'pat_lpS2K0RXBJyOufVAZCofCQ5R49tf7UqTnfvQKa8xnvVDPwPLV7pMAsbjKqSHAOS0'
+                            }
+                        }
+                    });
+                }
+            };
+            
+            return (
+                <div className="bg-[#f4f1ea] min-h-screen pb-20 relative overflow-hidden">
+                    <StatusBar />
+                    <nav className="sticky top-0 z-30 bg-[#f4f1ea]/90 backdrop-blur-md px-4 py-3 border-b border-stone-200/50">
+                        <div className="flex items-center justify-between">
+                            <button onClick={() => selectedId ? setSelectedId(null) : navigate(-1)} className="p-2 -ml-2 text-stone-500 hover:text-stone-800 transition-colors">
+                                <span className="material-icons-round">{selectedId ? 'arrow_back' : 'arrow_back_ios_new'}</span>
+                            </button>
+                            <h1 className="text-base font-bold serif-font text-stone-800">
+                                {(selectedId && selectedMemory) ? selectedMemory.title : '人生书签回忆录'}
+                            </h1>
+                            <div className="w-8"></div>
+                        </div>
+                    </nav>
+
+                    <main className="px-6 py-8">
+                        {!selectedId ? (
+                            <div className="space-y-12 animate-fade-in">
+                                <header className="pl-4 border-l-2 border-primary/30">
+                                    <h2 className="text-2xl font-bold serif-font text-stone-800 mb-2">苏敏的“出走”编年史</h2>
+                                    <p className="text-xs text-stone-500 tracking-wider uppercase">Parallel Universe Collection</p>
+                                </header>
+
+                                <div className="relative space-y-16 before:content-[''] before:absolute before:left-[19px] before:top-4 before:bottom-0 before:w-px before:bg-stone-300 before:border-l before:border-dashed before:border-stone-300">
+                                    {MEMORY_DATA.map((item, index) => (
+                                        <div key={item.id} className="relative pl-12 group">
+                                            {/* Timeline Node */}
+                                            <div className="absolute left-[13px] top-6 w-3.5 h-3.5 rounded-full bg-white border-2 border-primary z-10 group-hover:scale-125 transition-transform duration-300 shadow-sm"></div>
+                                            
+                                            {/* Date Label */}
+                                            <div className="absolute -left-2 -top-6 bg-stone-800 text-white text-[10px] px-2 py-0.5 rounded font-bold tracking-wider shadow-sm">
+                                                {item.date}
+                                            </div>
+
+                                            {/* Polaroid Card */}
+                                            <div 
+                                                onClick={() => setSelectedId(item.id)}
+                                                className="bg-white p-3 pb-8 shadow-xl shadow-stone-200/50 rotate-1 hover:rotate-0 transition-all duration-500 ease-out-back cursor-pointer transform hover:-translate-y-1"
+                                            >
+                                                <div className="bg-stone-100 mb-4 overflow-hidden relative">
+                                                    <img src={item.img} alt={item.title} className="w-full h-auto block opacity-90 group-hover:opacity-100 transition-opacity duration-500 grayscale-[20%] group-hover:grayscale-0" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
+                                                    <div className="absolute bottom-2 right-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-bold text-stone-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        点击查看详情
+                                                    </div>
+                                                </div>
+                                                <div className="px-2">
+                                                    <div className="flex justify-between items-baseline mb-2">
+                                                        <h3 className="font-bold text-stone-800 serif-font text-lg">{item.title}</h3>
+                                                        <span className="text-[10px] text-stone-400 uppercase tracking-widest flex items-center gap-1">
+                                                            <span className="material-icons-round text-[10px]">place</span>
+                                                            {item.location}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-stone-600 leading-relaxed mb-4 font-serif text-justify border-b border-stone-100 pb-3 line-clamp-2">
+                                                        {item.desc}
+                                                    </p>
+                                                    <p className="text-[10px] text-primary font-serif italic text-right">
+                                                        {item.quote}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="animate-slide-up space-y-8 pb-20">
+                                {/* Detail Header Image */}
+                                <div className="relative rounded-2xl overflow-hidden shadow-lg mb-6">
+                                    <img src={selectedMemory.img} alt={selectedMemory.title} className="w-full h-auto block" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                                    <div className="absolute bottom-4 left-4 text-white">
+                                        <div className="text-xs opacity-80 mb-1">{selectedMemory.date} · {selectedMemory.location}</div>
+                                        <h2 className="text-2xl font-bold serif-font">{selectedMemory.title}</h2>
+                                    </div>
+                                </div>
+
+                                {/* Full Text Content */}
+                                <section className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
+                                    <div className="prose prose-stone prose-sm max-w-none font-serif leading-relaxed text-justify">
+                                        <p className="first-letter:text-3xl first-letter:font-bold first-letter:text-primary first-letter:mr-1 first-letter:float-left">
+                                            {selectedMemory.fullText}
+                                        </p>
+                                    </div>
+                                    <div className="mt-6 pt-4 border-t border-stone-100">
+                                        <p className="text-sm text-primary font-bold italic text-center serif-font">
+                                            {selectedMemory.quote}
+                                        </p>
+                                    </div>
+                                </section>
+
+                                {/* Parallel Universe Paths */}
+                                <section className="space-y-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-icons-round text-primary text-sm">alt_route</span>
+                                        <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wider">平行时空推演</h3>
+                                    </div>
+                                    
+                                    <div className="flex flex-col gap-4">
+                                        {/* Reality Path Card - Always Visible */}
+                                        {selectedMemory.paths.length > 0 && (() => {
+                                            const realityPath = selectedMemory.paths[0];
+                                            return (
+                                                <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm hover:border-primary/30 transition-all relative overflow-hidden">
+                                                    <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div>
+                                                            <span className="text-[10px] font-bold text-primary tracking-widest block mb-1">
+                                                                现实路径
+                                                            </span>
+                                                            <h4 className="font-bold text-stone-800 text-base serif-font">
+                                                                {realityPath.title}
+                                                            </h4>
+                                                        </div>
+                                                        <span className="bg-primary/10 text-primary text-[10px] px-2 py-1 rounded font-bold">Current</span>
+                                                    </div>
+                                                    <p className="text-xs text-stone-500 leading-relaxed mb-4">
+                                                        {realityPath.desc}
+                                                    </p>
+                                                    <button 
+                                                        onClick={() => navigate('/branch-details', { state: { memoryId: selectedMemory.id, pathId: realityPath.id } })}
+                                                        className="w-full py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-colors bg-primary/5 text-primary hover:bg-primary/10"
+                                                    >
+                                                        查看回忆详情
+                                                        <span className="material-symbols-outlined text-sm">visibility</span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Branches Grid Layout */}
+                                        {selectedMemory.paths.length > 1 && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                                {selectedMemory.paths.slice(1).map((path, index) => (
+                                                    <div 
+                                                        key={path.id}
+                                                        className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm hover:border-stone-300 transition-all flex flex-col"
+                                                    >
+                                                        <div className="flex justify-between items-start mb-3">
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-stone-400 tracking-widest block mb-1">
+                                                                    分支 {index + 1}
+                                                                </span>
+                                                                <h4 className="font-bold text-stone-800 text-base serif-font">
+                                                                    {path.title}
+                                                                </h4>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-xs text-stone-500 leading-relaxed mb-4 flex-grow">
+                                                            {path.desc}
+                                                        </p>
+                                                        <button 
+                                                            onClick={() => navigate('/branch-details', { state: { memoryId: selectedMemory.id, pathId: path.id } })}
+                                                            className="w-full py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-colors bg-stone-50 text-stone-600 hover:bg-stone-100 hover:text-stone-800"
+                                                        >
+                                                            展开推演详情
+                                                            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+                                
+                                <section className="pt-2">
+                                    <button onClick={handleChatClick} className="w-full flex items-center justify-center gap-2 bg-stone-800 text-white py-4 px-4 rounded-2xl shadow-lg active:scale-[0.98] transition-all">
+                                        <span className="material-symbols-outlined text-xl">forum</span>
+                                        <span className="text-sm font-bold serif-font">关于这段往事，和她聊聊</span>
+                                    </button>
+                                </section>
+
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+
+        const App = () => {
+            return (
+                <HashRouter>
+                    <div className="min-h-screen bg-white">
+                        <Routes>
+                            <Route path="/" element={<ReadingView />} />
+                            <Route path="/unlock" element={<UnlockView />} />
+                            <Route path="/branch-details" element={<BranchDetails />} />
+                            <Route path="/chat" element={<ChatView />} />
+                            <Route path="/memory-lane" element={<MemoryLane />} />
+                        </Routes>
+
+                    </div>
+                </HashRouter>
+            );
+        };
+
+        const container = document.getElementById('root');
+        const root = createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
